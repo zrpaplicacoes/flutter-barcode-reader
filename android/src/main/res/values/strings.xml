@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="turn_on_flashlight">Ligar flash</string>
+    <string name="turn_off_flashlight">Desligar flash</string>
+    <string name="scan_message">Posicione a linha verde sobre o código de barras, a leitura é automática</string>
+    <string name="barcode_scanner_title">Leitor de código de barras</string>
+</resources>

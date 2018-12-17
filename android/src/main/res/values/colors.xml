@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="scan_line_green">#FF00C08B</color>
+    <color name="system_bar_color">#ff00a376</color>
+</resources>
