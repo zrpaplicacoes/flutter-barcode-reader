@@ -2,8 +2,12 @@
   package="com.yourcompany.barcodescan">
 
   <uses-permission android:name="android.permission.CAMERA" />
+  <uses-feature android:name="android.hardware.camera" android:required="false"></uses-feature>
 
   <application>
-    <activity android:name="com.apptreesoftware.barcodescan.BarcodeScannerActivity" />
+    <activity android:name="com.apptreesoftware.barcodescan.BarcodeScannerActivity" android:screenOrientation="landscape" android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
+    <meta-data
+        android:name="preloaded_fonts"
+        android:resource="@array/preloaded_fonts" />
   </application>
 </manifest>

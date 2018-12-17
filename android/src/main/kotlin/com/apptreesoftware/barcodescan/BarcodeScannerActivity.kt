@@ -1,134 +1,122 @@
 package com.apptreesoftware.barcodescan
 
-import android.Manifest
-import android.app.Activity
-import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Bundle
-import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
-import android.view.Menu
+import android.support.v7.app.AppCompatActivity
+import android.support.v7.widget.Toolbar
+import android.view.KeyEvent
 import android.view.MenuItem
-import com.google.zxing.Result
-import me.dm7.barcodescanner.zxing.ZXingScannerView
+import android.view.View
+import android.view.WindowManager
+import android.widget.Button
 
+import com.journeyapps.barcodescanner.CaptureManager
+import com.journeyapps.barcodescanner.DecoratedBarcodeView
+import com.journeyapps.barcodescanner.ViewfinderView
+import com.yourcompany.barcodescan.R
 
-class BarcodeScannerActivity : Activity(), ZXingScannerView.ResultHandler {
+class BarcodeScannerActivity : AppCompatActivity(), DecoratedBarcodeView.TorchListener {
 
-    lateinit var scannerView: me.dm7.barcodescanner.zxing.ZXingScannerView
-
-    companion object {
-        val REQUEST_TAKE_PHOTO_CAMERA_PERMISSION = 100
-        val TOGGLE_FLASH = 200
-
-    }
+    private var capture: CaptureManager? = null
+    private var barcodeScannerView: DecoratedBarcodeView? = null
+    private var switchFlashlightButton: Button? = null
+    private var viewfinderView: ViewfinderView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        title = ""
-        scannerView = ZXingScannerView(this)
-        scannerView.setAutoFocus(true)
-        setContentView(scannerView)
+        setContentView(R.layout.activity_barcode_scanner)
+
+        barcodeScannerView = findViewById(R.id.zxing_barcode_scanner)
+        barcodeScannerView!!.setTorchListener(this)
+
+        switchFlashlightButton = findViewById<Button>(R.id.switch_flashlight)
+
+        viewfinderView = findViewById(R.id.zxing_viewfinder_view)
+
+        // if the device does not have flashlight in its camera,
+        // then remove the switch flashlight button...
+        if (!hasFlash()) {
+            switchFlashlightButton!!.visibility = View.GONE
+        }
+
+        val toolbar = findViewById<Toolbar>(R.id.toolbar)
+
+        setSupportActionBar(toolbar)
+
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        supportActionBar?.setHomeButtonEnabled(true)
+        window.statusBarColor = ContextCompat.getColor(this, R.color.system_bar_color)
+
+        window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
+
+        capture = CaptureManager(this, barcodeScannerView)
+        capture!!.initializeFromIntent(intent, savedInstanceState)
+        capture!!.decode()
+
+        changeMaskColor(null)
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        if (scannerView.flash) {
-            val item = menu.add(0,
-                    TOGGLE_FLASH, 0, "Flash Off")
-            item.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
-        } else {
-            val item = menu.add(0,
-                    TOGGLE_FLASH, 0, "Flash On")
-            item.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
-        }
-        return super.onCreateOptionsMenu(menu)
+    override fun onResume() {
+        super.onResume()
+        capture!!.onResume()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        capture!!.onPause()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        capture!!.onDestroy()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        capture!!.onSaveInstanceState(outState)
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        return barcodeScannerView!!.onKeyDown(keyCode, event) || super.onKeyDown(keyCode, event)
+    }
+
+    override fun onTorchOn() {
+        switchFlashlightButton!!.setText(R.string.turn_off_flashlight)
+    }
+
+    override fun onTorchOff() {
+        switchFlashlightButton!!.setText(R.string.turn_on_flashlight)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == TOGGLE_FLASH) {
-            scannerView.flash = !scannerView.flash
-            this.invalidateOptionsMenu()
+        if (item.itemId == android.R.id.home) {
+            finish()
             return true
         }
         return super.onOptionsItemSelected(item)
     }
 
-    override fun onResume() {
-        super.onResume()
-        scannerView.setResultHandler(this)
-        // start camera immediately if permission is already given
-        if (!requestCameraAccessIfNecessary()) {
-            scannerView.startCamera()
+    fun switchFlashlight(@Suppress("UNUSED_PARAMETER") view: View) {
+        if (getString(R.string.turn_on_flashlight) == switchFlashlightButton!!.text) {
+            barcodeScannerView!!.setTorchOn()
+        } else {
+            barcodeScannerView!!.setTorchOff()
         }
     }
-
-    override fun onPause() {
-        super.onPause()
-        scannerView.stopCamera()
-    }
-
-    override fun handleResult(result: Result?) {
-        val intent = Intent()
-        intent.putExtra("SCAN_RESULT", result.toString())
-        setResult(Activity.RESULT_OK, intent)
-        finish()
-    }
-
-    fun finishWithError(errorCode: String) {
-        val intent = Intent()
-        intent.putExtra("ERROR_CODE", errorCode)
-        setResult(Activity.RESULT_CANCELED, intent)
-        finish()
-    }
-
-    private fun requestCameraAccessIfNecessary(): Boolean {
-        val array = arrayOf(Manifest.permission.CAMERA)
-        if (ContextCompat
-                .checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-
-            ActivityCompat.requestPermissions(this, array,
-                    REQUEST_TAKE_PHOTO_CAMERA_PERMISSION)
-            return true
-        }
-        return false
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>,grantResults: IntArray) {
-        when (requestCode) {
-            REQUEST_TAKE_PHOTO_CAMERA_PERMISSION -> {
-                if (PermissionUtil.verifyPermissions(grantResults)) {
-                    scannerView.startCamera()
-                } else {
-                    finishWithError("PERMISSION_NOT_GRANTED")
-                }
-            }
-            else -> {
-                super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-            }
-        }
-    }
-}
-
-object PermissionUtil {
 
     /**
-     * Check that all given permissions have been granted by verifying that each entry in the
-     * given array is of the value [PackageManager.PERMISSION_GRANTED].
-
-     * @see Activity.onRequestPermissionsResult
+     * Check if the device's camera has a Flashlight.
+     * @return true if there is Flashlight, otherwise false.
      */
-    fun verifyPermissions(grantResults: IntArray): Boolean {
-        // At least one result must be checked.
-        if (grantResults.size < 1) {
-            return false
-        }
+    private fun hasFlash(): Boolean {
+        return applicationContext.packageManager
+                .hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH)
+    }
 
-        // Verify that each required permission has been granted, otherwise return false.
-        for (result in grantResults) {
-            if (result != PackageManager.PERMISSION_GRANTED) {
-                return false
-            }
-        }
-        return true
+    private fun changeMaskColor(@Suppress("UNUSED_PARAMETER") view: View?) {
+        val color = Color.argb(100, 0, 0, 0)
+        viewfinderView!!.setBackgroundColor(color)
     }
 }
